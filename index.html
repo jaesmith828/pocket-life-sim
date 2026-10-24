@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pocket Life Sim</title>
+<style>
+  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  body { margin: 0; background: #12141a; color: #fff; display: flex; flex-direction: column; align-items: center; height: 100dvh; overflow: hidden; }
+  #top-bar { width: 100%; max-width: 430px; background: #1c2029; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2e3442; }
+  .sim-info { display: flex; flex-direction: column; }
+  .sim-name { font-weight: 800; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 6px; }
+  .sim-career { font-size: 11px; color: #9ab0c7; margin-top: 2px; }
+  .money-badge { background: #143625; color: #2ecc71; border: 1px solid #2ecc71; padding: 5px 10px; border-radius: 20px; font-weight: 800; font-size: 15px; }
+  #canvas-wrap { position: relative; width: 100%; max-width: 430px; flex: 1; display: flex; align-items: center; justify-content: center; background: #161922; overflow: hidden; }
+  canvas { width: 100%; height: 100%; object-fit: contain; touch-action: none; }
+  .drawer { display: none; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(24, 28, 38, 0.96); border: 1px solid #414a5e; border-radius: 14px; padding: 12px; flex-direction: column; gap: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); z-index: 10; }
+  .drawer-title { font-size: 12px; font-weight: 700; color: #a5b2c6; display: flex; justify-content: space-between; }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  #bottom-hud { width: 100%; max-width: 430px; background: #1c2029; padding: 10px 14px 16px; border-top: 1px solid #2e3442; display: flex; flex-direction: column; gap: 10px; }
+  .needs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .need-item { display: flex; flex-direction: column; font-size: 11px; font-weight: 700; color: #b0b8c8; }
+  .bar-bg { width: 100%; height: 8px; background: #111318; border-radius: 4px; overflow: hidden; margin-top: 4px; border: 1px solid #2c3240; }
+  .bar-fill { height: 100%; width: 80%; background: #2ecc71; transition: width 0.2s, background 0.3s; }
+  .toolbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  button { background: #2b3242; color: #fff; border: 1px solid #3d4659; padding: 9px 10px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  button:active { transform: scale(0.97); }
+  button.primary { background: #3498db; border-color: #5dade2; }
+  button.active { background: #e67e22; border-color: #f39c12; }
+  #cas-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 20; align-items: center; justify-content: center; padding: 16px; }
+  .modal-card { background: #1f2430; border: 1px solid #3c4456; border-radius: 16px; width: 100%; max-width: 360px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .field-label { font-size: 11px; font-weight: 700; color: #8fa0b5; text-transform: uppercase; }
+  input, select { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #3c4456; background: #14171f; color: #fff; font-size: 14px; font-weight: 600; }
+  .swatch-row { display: flex; gap: 8px; }
+  .swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .swatch.selected { border-color: #fff; transform: scale(1.1); }
+</style>
+</head>
+<body>
+<div id="top-bar">
+  <div class="sim-info">
+    <div class="sim-name"><span id="ui-name">Alex</span> <span style="font-size:11px; color:#f1c40f;" id="ui-rel">♥ Friend: 20%</span></div>
+    <div class="sim-career" id="ui-career">🎵 Music Producer (Lvl 1) • Idle</div>
+  </div>
+  <div class="money-badge" id="ui-money">$200</div>
+</div>
+<div id="canvas-wrap">
+  <canvas id="canvas" width="400" height="460"></canvas>
+  <div id="buy-drawer" class="drawer">
+    <div class="drawer-title">
+      <span>🛋️ TAP AN ITEM, THEN TAP FLOOR TO PLACE</span>
+      <span onclick="closeDrawers()" style="cursor:pointer; color:#fff;">✕</span>
+    </div>
+    <div class="btn-row">
+      <button onclick="selectBuy('Espresso', 100, '#8d5524', 'energy', '☕ Espresso')">☕ Espresso ($100)</button>
+      <button onclick="selectBuy('Pro Rig', 250, '#8e44ad', 'work', '🎛️ Pro Rig')">🎛️ Pro Studio ($250)</button>
+      <button onclick="selectBuy('Arcade', 180, '#e84393', 'fun', '🕹️ Arcade')">🕹️ Arcade ($180)</button>
+    </div>
+  </div>
+  <div id="social-drawer" class="drawer">
+    <div class="drawer-title">
+      <span>💬 INTERACT WITH NOVA (ROOMMATE)</span>
+      <span onclick="closeDrawers()" style="cursor:pointer; color:#fff;">✕</span>
+    </div>
+    <div class="btn-row">
+      <button class="primary" onclick="doSocial('Chat', 18, 8)">🗣️ Deep Chat</button>
+      <button class="primary" onclick="doSocial('Joke', 22, 10)">😂 Tell Joke</button>
+      <button class="primary" onclick="doSocial('Collab', 15, 15)">🔥 Studio Collab</button>
+      <button class="primary" onclick="doSocial('Flirt', 25, 18)">💖 Flirt</button>
+    </div>
+  </div>
+</div>
+<div id="bottom-hud">
+  <div class="needs-grid">
+    <div class="need-item">🍔 Hunger <div class="bar-bg"><div id="bar-hunger" class="bar-fill"></div></div></div>
+    <div class="need-item">⚡ Energy <div class="bar-bg"><div id="bar-energy" class="bar-fill"></div></div></div>
+    <div class="need-item">🎮 Fun <div class="bar-bg"><div id="bar-fun" class="bar-fill"></div></div></div>
+    <div class="need-item">💬 Social <div class="bar-bg"><div id="bar-social" class="bar-fill"></div></div></div>
+  </div>
+  <div class="toolbar">
+    <button onclick="openCAS()">👕 Wardrobe</button>
+    <button id="btn-buy" onclick="toggleBuyDrawer()">🛋️ Build/Buy</button>
+    <button id="btn-ai" class="active" onclick="toggleAI()">🤖 Auto: ON</button>
+  </div>
+</div>
+<div id="cas-modal">
+  <div class="modal-card">
+    <div style="font-weight:800; font-size:17px;">✨ Customize Your Sim</div>
+    <div>
+      <div class="field-label">Sim Name</div>
+      <input type="text" id="inp-name" value="Alex" maxlength="14">
+    </div>
+    <div>
+      <div class="field-label">Career Path</div>
+      <select id="inp-career">
+        <option value="🎵 Music Producer">🎵 Music Producer</option>
+        <option value="🧵 Fashion Designer">🧵 Fashion Designer</option>
+        <option value="🎬 Film Director">🎬 Film Director</option>
+        <option value="💻 App Founder">💻 App Founder</option>
+      </select>
+    </div>
+    <div>
+      <div class="field-label">Skin Tone</div>
+      <div class="swatch-row" id="skin-swatches"></div>
+    </div>
+    <div>
+      <div class="field-label">Outfit Style</div>
+      <div class="swatch-row" id="outfit-swatches"></div>
+    </div>
+    <button class="primary" style="padding:12px; font-size:14px; margin-top:4px;" onclick="saveCAS()">Save & Play</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let money = 200;
+let autoAI = true;
+let pendingBuy = null;
+let floatTexts = [];
+const skins = ['#f5cba7', '#e0ac69', '#c68642', '#8d5524', '#5c3818'];
+const outfits = ['#3498db', '#e74c3c', '#9b59b6', '#2ecc71', '#f1c40f', '#1abc9c'];
+const sim = {
+  name: 'Alex', career: '🎵 Music Producer', level: 1, xp: 0,
+  skin: '#e0ac69', outfit: '#3498db',
+  x: 200, y: 250, targetX: 200, targetY: 250, speed: 2.5,
+  action: 'Idle', interactingWith: null, timer: 0, relationship: 20,
+  needs: { hunger: 80, energy: 85, fun: 75, social: 70 }
+};
+const npc = { name: 'Nova', skin: '#c68642', outfit: '#e84393', x: 140, y: 290, targetX: 140, targetY: 290, timer: 0 };
+const furniture = [
+  { name: 'Fridge', x: 32, y: 65, w: 72, h: 62, color: '#dfe6e9', textCol: '#2d3436', need: 'hunger', gain: 45, cost: 10, duration: 80, label: '🧊 Fridge' },
+  { name: 'Bed', x: 280, y: 65, w: 88, h: 105, color: '#c0392b', textCol: '#fff', need: 'energy', gain: 65, cost: 0, duration: 120, label: '🛏️ Loft Bed' },
+  { name: 'Studio', x: 265, y: 345, w: 105, h: 72, color: '#d35400', textCol: '#fff', need: 'work', gain: 0, cost: -55, duration: 100, label: '💻 Studio' },
+  { name: 'Lounge', x: 32, y: 345, w: 105, h: 72, color: '#2980b9', textCol: '#fff', need: 'fun', gain: 50, cost: 0, duration: 85, label: '📺 TV Sofa' }
+];
+// Older phone browsers lack roundRect; fall back to a plain rectangle.
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); return this; };
+}
+function initSwatches() {
+  const sBox = document.getElementById('skin-swatches');
+  skins.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'swatch' + (c === sim.skin ? ' selected' : '');
+    d.style.background = c;
+    d.onclick = () => { sim.skin = c; updateSwatchUI(); };
+    sBox.appendChild(d);
+  });
+  const oBox = document.getElementById('outfit-swatches');
+  outfits.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'swatch' + (c === sim.outfit ? ' selected' : '');
+    d.style.background = c;
+    d.onclick = () => { sim.outfit = c; updateSwatchUI(); };
+    oBox.appendChild(d);
+  });
+}
+function updateSwatchUI() {
+  [...document.getElementById('skin-swatches').children].forEach((el, i) => el.classList.toggle('selected', skins[i] === sim.skin));
+  [...document.getElementById('outfit-swatches').children].forEach((el, i) => el.classList.toggle('selected', outfits[i] === sim.outfit));
+}
+initSwatches();
+function openCAS() { document.getElementById('cas-modal').style.display = 'flex'; }
+function saveCAS() {
+  sim.name = document.getElementById('inp-name').value || 'Alex';
+  sim.career = document.getElementById('inp-career').value;
+  document.getElementById('ui-name').textContent = sim.name;
+  document.getElementById('cas-modal').style.display = 'none';
+}
+function closeDrawers() {
+  document.getElementById('buy-drawer').style.display = 'none';
+  document.getElementById('social-drawer').style.display = 'none';
+  document.getElementById('btn-buy').classList.remove('active');
+  pendingBuy = null;
+}
+function toggleBuyDrawer() {
+  const d = document.getElementById('buy-drawer');
+  const open = d.style.display !== 'flex';
+  closeDrawers();
+  if (open) { d.style.display = 'flex'; document.getElementById('btn-buy').classList.add('active'); }
+}
+function toggleAI() {
+  autoAI = !autoAI;
+  const btn = document.getElementById('btn-ai');
+  btn.textContent = `🤖 Auto: ${autoAI ? 'ON' : 'OFF'}`;
+  btn.classList.toggle('active', autoAI);
+}
+function selectBuy(name, price, color, need, label) {
+  if (money < price) { addFloat(200, 220, 'Need more $$$!', '#e74c3c'); return; }
+  pendingBuy = { name, price, color, need, label };
+  addFloat(200, 200, 'Tap floor to place!', '#f1c40f');
+}
+function doSocial(type, socialGain, relGain) {
+  closeDrawers();
+  sim.interactingWith = { isNPC: true, type, socialGain, relGain, duration: 75 };
+  sim.targetX = npc.x; sim.targetY = npc.y + 34;
+  sim.action = `${type} w/ Nova`;
+}
+function addFloat(x, y, text, color = '#2ecc71') { floatTexts.push({ x, y, text, color, alpha: 1 }); }
+canvas.addEventListener('pointerdown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  if (pendingBuy) {
+    money -= pendingBuy.price;
+    furniture.push({ name: pendingBuy.name, x: mx - 38, y: my - 30, w: 76, h: 60, color: pendingBuy.color, textCol: '#fff',
+      need: pendingBuy.need, gain: 55, cost: pendingBuy.need === 'work' ? -95 : 0, duration: 75, label: pendingBuy.label });
+    addFloat(mx, my, `-$${pendingBuy.price}`, '#f39c12');
+    closeDrawers();
+    return;
+  }
+  if (Math.hypot(mx - npc.x, my - npc.y) < 32) { closeDrawers(); document.getElementById('social-drawer').style.display = 'flex'; return; }
+  for (let f of furniture) {
+    if (mx >= f.x && mx <= f.x + f.w && my >= f.y && my <= f.y + f.h) { closeDrawers(); startFurnitureAction(f); return; }
+  }
+  closeDrawers();
+  sim.interactingWith = null; sim.timer = 0; sim.action = 'Walking';
+  sim.targetX = Math.max(40, Math.min(360, mx));
+  sim.targetY = Math.max(75, Math.min(420, my));
+});
+function startFurnitureAction(f) {
+  sim.interactingWith = f; sim.timer = 0;
+  sim.targetX = f.x + f.w / 2; sim.targetY = f.y + f.h + 18;
+  sim.action = `Going to ${f.name}`;
+}
+function update() {
+  sim.needs.hunger = Math.max(0, sim.needs.hunger - 0.022);
+  sim.needs.energy = Math.max(0, sim.needs.energy - 0.016);
+  sim.needs.fun = Math.max(0, sim.needs.fun - 0.020);
+  sim.needs.social = Math.max(0, sim.needs.social - 0.015);
+  npc.timer++;
+  if (npc.timer > 220) { npc.targetX = 70 + Math.random() * 260; npc.targetY = 160 + Math.random() * 170; npc.timer = 0; }
+  const ndx = npc.targetX - npc.x, ndy = npc.targetY - npc.y, ndist = Math.hypot(ndx, ndy);
+  if (ndist > 1.2 && (!sim.interactingWith || !sim.interactingWith.isNPC)) { npc.x += (ndx / ndist) * 1.1; npc.y += (ndy / ndist) * 1.1; }
+  const dx = sim.targetX - sim.x, dy = sim.targetY - sim.y, dist = Math.hypot(dx, dy);
+  if (dist > sim.speed) {
+    sim.x += (dx / dist) * sim.speed; sim.y += (dy / dist) * sim.speed;
+  } else if (sim.interactingWith) {
+    const obj = sim.interactingWith;
+    sim.timer++;
+    sim.action = obj.isNPC ? `${obj.type} w/ Nova...` : `Using ${obj.name}...`;
+    if (sim.timer >= obj.duration) {
+      if (obj.isNPC) {
+        sim.needs.social = Math.min(100, sim.needs.social + obj.socialGain);
+        sim.needs.fun = Math.min(100, sim.needs.fun + 12);
+        sim.relationship = Math.min(100, sim.relationship + obj.relGain);
+        if (obj.type === 'Collab') { const bonus = 45 + sim.level * 15; money += bonus; addFloat(sim.x, sim.y - 35, `Collab +$${bonus}!`, '#2ecc71'); }
+        else { addFloat(sim.x, sim.y - 35, `♥ +${obj.relGain} Friendship`, '#ff6b81'); }
+      } else if (obj.need === 'work') {
+        const pay = Math.abs(obj.cost) + (sim.level - 1) * 20;
+        money += pay; sim.xp += 35;
+        sim.needs.energy = Math.max(0, sim.needs.energy - 14);
+        sim.needs.fun = Math.max(0, sim.needs.fun - 10);
+        addFloat(sim.x, sim.y - 35, `+$${pay}`, '#2ecc71');
+        if (sim.xp >= 100) { sim.level++; sim.xp = 0; addFloat(sim.x, sim.y - 55, `⭐ PROMOTED TO LVL ${sim.level}!`, '#f1c40f'); }
+      } else {
+        if (money >= obj.cost) { money -= obj.cost; sim.needs[obj.need] = Math.min(100, sim.needs[obj.need] + obj.gain); addFloat(sim.x, sim.y - 35, `+${obj.need.toUpperCase()}`, '#2ecc71'); }
+        else { addFloat(sim.x, sim.y - 35, 'Broke!', '#e74c3c'); }
+      }
+      sim.interactingWith = null; sim.timer = 0; sim.action = 'Idle';
+    }
+  } else {
+    sim.action = 'Idle';
+    if (autoAI) {
+      const lowest = Object.entries(sim.needs).sort((a, b) => a[1] - b[1])[0];
+      if (lowest[1] < 35) {
+        if (lowest[0] === 'social') { doSocial('Chat', 20, 8); }
+        else { const item = furniture.find(f => f.need === lowest[0]); if (item) startFurnitureAction(item); }
+      }
+    }
+  }
+  document.getElementById('ui-money').textContent = `$${money}`;
+  const relStatus = sim.relationship >= 80 ? 'Soulmate' : sim.relationship >= 50 ? 'Bestie' : 'Friend';
+  document.getElementById('ui-rel').textContent = `♥ ${relStatus}: ${sim.relationship}%`;
+  document.getElementById('ui-career').textContent = `${sim.career} (Lvl ${sim.level}) • ${sim.action}`;
+  for (let [k, v] of Object.entries(sim.needs)) {
+    const b = document.getElementById(`bar-${k}`);
+    b.style.width = `${v}%`;
+    b.style.background = v > 50 ? '#2ecc71' : v > 25 ? '#f1c40f' : '#e74c3c';
+  }
+}
+function drawCharacter(x, y, skin, outfit, name, isPlayer) {
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y + 18, 13, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = outfit;
+  ctx.beginPath(); ctx.roundRect(x - 10, y - 4, 20, 20, 6); ctx.fill();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(x, y - 12, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(name, x, y + 30);
+  if (isPlayer) {
+    const avg = (sim.needs.hunger + sim.needs.energy + sim.needs.fun + sim.needs.social) / 4;
+    ctx.fillStyle = avg > 55 ? '#2ecc71' : avg > 30 ? '#f1c40f' : '#e74c3c';
+    const bob = Math.sin(Date.now() / 180) * 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 42 + bob); ctx.lineTo(x + 6, y - 34 + bob); ctx.lineTo(x, y - 26 + bob); ctx.lineTo(x - 6, y - 34 + bob);
+    ctx.closePath(); ctx.fill();
+  }
+}
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#252a38'; ctx.fillRect(16, 16, 368, 42);
+  ctx.fillStyle = '#1e222d'; ctx.fillRect(16, 58, 368, 386);
+  ctx.strokeStyle = '#252a37'; ctx.lineWidth = 1;
+  for (let x = 16; x <= 384; x += 36.8) { for (let y = 58; y <= 444; y += 38.6) { ctx.strokeRect(x, y, 36.8, 38.6); } }
+  ctx.fillStyle = '#2c2540'; ctx.strokeStyle = '#4e3f73'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(125, 195, 150, 110, 12); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#454e66'; ctx.lineWidth = 4; ctx.strokeRect(16, 16, 368, 428);
+  for (let f of furniture) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.roundRect(f.x, f.y + 7, f.w, f.h, 8); ctx.fill();
+    ctx.fillStyle = f.color;
+    ctx.beginPath(); ctx.roundRect(f.x, f.y, f.w, f.h, 8); ctx.fill();
+    ctx.fillStyle = f.textCol; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(f.label, f.x + f.w / 2, f.y + f.h / 2 + 4);
+  }
+  drawCharacter(npc.x, npc.y, npc.skin, npc.outfit, 'Nova', false);
+  drawCharacter(sim.x, sim.y, sim.skin, sim.outfit, sim.name, true);
+  if (sim.interactingWith && sim.timer > 0) {
+    const pct = sim.timer / sim.interactingWith.duration;
+    ctx.fillStyle = '#000'; ctx.fillRect(sim.x - 20, sim.y - 52, 40, 5);
+    ctx.fillStyle = '#2ecc71'; ctx.fillRect(sim.x - 20, sim.y - 52, 40 * pct, 5);
+  }
+  for (let i = floatTexts.length - 1; i >= 0; i--) {
+    const ft = floatTexts[i];
+    ctx.fillStyle = ft.color; ctx.globalAlpha = ft.alpha;
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ft.y -= 0.7; ft.alpha -= 0.02;
+    if (ft.alpha <= 0) floatTexts.splice(i, 1);
+  }
+  ctx.globalAlpha = 1;
+  update();
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
